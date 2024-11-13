@@ -1,0 +1,7 @@
+/* 지도 스타일링 */
+.map {
+    width: 100%;
+    height: 100vh;
+    position: relative;
+  }
+  
