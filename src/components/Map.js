@@ -38,7 +38,7 @@ const Map = ({ position, setPosition, stations, handleMarkerClick }) => {
 
           // 현재 위치 마커 설정
           const currentMarkerImage = new window.kakao.maps.MarkerImage(
-            'https://raw.githubusercontent.com/ijunsoo/GasStation/main/green-pin-with-pin-it_136558-84685-removebg-preview.png',
+            'https://github.com/ijunsoo/GasStation/blob/main/src/%EB%8B%A4%EC%9A%B4%EB%A1%9C%EB%93%9C.jfif?raw=true',
             new window.kakao.maps.Size(32, 32)
           );
 
@@ -57,7 +57,7 @@ const Map = ({ position, setPosition, stations, handleMarkerClick }) => {
             });
           });
 
-          // 주유소 마커와 항상 표시될 인포윈도우 설정
+          // 주유소 마커와 마우스 오버 시 표시될 인포윈도우 설정
           const stationMarkerImage = new window.kakao.maps.MarkerImage(
             'https://img.icons8.com/fluency/48/008000/marker.png',
             new window.kakao.maps.Size(32, 32)
@@ -74,7 +74,7 @@ const Map = ({ position, setPosition, stations, handleMarkerClick }) => {
             // 거리 계산
             const distance = calculateDistance(position.lat, position.lng, station.latitude, station.longitude).toFixed(2);
 
-            // 항상 표시될 인포윈도우 설정
+            // 인포윈도우 설정 (기본적으로 숨김)
             const infoWindow = new window.kakao.maps.InfoWindow({
               content: `
                 <div style="padding:5px; font-size:14px;">
@@ -83,14 +83,16 @@ const Map = ({ position, setPosition, stations, handleMarkerClick }) => {
                   거리: ${distance} km
                 </div>
               `,
-              removable: false, // 항상 표시되도록 설정
             });
 
-            infoWindow.open(mapInstance.current, stationMarker);
+            // 마커에 마우스 올릴 때 인포윈도우 열기
+            window.kakao.maps.event.addListener(stationMarker, 'mouseover', () => {
+              infoWindow.open(mapInstance.current, stationMarker);
+            });
 
-            // 마커 클릭 시 주유소 정보 업데이트
-            window.kakao.maps.event.addListener(stationMarker, 'click', () => {
-              handleMarkerClick(station);
+            // 마커에서 마우스 뗄 때 인포윈도우 닫기
+            window.kakao.maps.event.addListener(stationMarker, 'mouseout', () => {
+              infoWindow.close();
             });
           });
         });
