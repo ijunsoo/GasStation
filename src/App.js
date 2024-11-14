@@ -5,41 +5,17 @@ import Map from './components/Map';
 
 const App = () => {
   const [position, setPosition] = useState({ lat: 37.5665, lng: 126.9784 });
-  const [stations, setStations] = useState([
-    {
-      id: 1,
-      name: '주유소1',
-      fuelType: 'Gasoline',
-      price: 1500,
-      lat: 37.5675,
-      lng: 126.9774,
-      address: '서울특별시 중구 세종대로 110',
-    },
-    {
-      id: 2,
-      name: '주유소2',
-      fuelType: 'Diesel',
-      price: 1400,
-      lat: 37.565,
-      lng: 126.975,
-      address: '서울특별시 중구 세종대로 120',
-    },
-    {
-      id: 3,
-      name: '주유소3',
-      fuelType: 'Premium Gasoline',
-      price: 1600,
-      lat: 37.563,
-      lng: 126.973,
-      address: '서울특별시 중구 세종대로 130',
-    },
-  ]);
-
+  const [stations, setStations] = useState([]); // 더미 데이터를 제거
   const [selectedStation, setSelectedStation] = useState(null);
   const [view, setView] = useState('map');
   const [fuelType, setFuelType] = useState('');
-  const [filteredStations, setFilteredStations] = useState(stations);
+  const [filteredStations, setFilteredStations] = useState([]);
   const [apiResponse, setApiResponse] = useState(null);
+
+  // 초기 로드 시 API 데이터 가져오기
+  useEffect(() => {
+    handleSearch();
+  }, []);
 
   // 연료 종류 필터링
   const handleFuelTypeChange = (type) => {
@@ -66,8 +42,8 @@ const App = () => {
   const handleSearch = async () => {
     try {
       const data = {
-        x: position.lat, // x로 위도 전달
-        y: position.lng, // y로 경도 전달
+        x: position.lat,
+        y: position.lng,
         radius: "5000",
         type: fuelType || '',
       };
@@ -83,8 +59,8 @@ const App = () => {
       if (response.ok) {
         const jsonResponse = await response.json();
         console.log('백엔드 API 응답:', jsonResponse);
-        setStations(jsonResponse.stations || []);
-        setFilteredStations(jsonResponse.stations || []);
+        setStations(jsonResponse.stations || []); // 백엔드 데이터 저장
+        setFilteredStations(jsonResponse.stations || []); // 필터된 데이터 업데이트
         setApiResponse(jsonResponse);
       } else {
         console.error('데이터를 가져오는 데 실패했습니다.');
@@ -127,7 +103,6 @@ const App = () => {
           <option value="">모든 연료 종류</option>
           <option value="Gasoline">휘발유(가솔린)</option>
           <option value="Diesel">경유(디젤)</option>
-          <option value="Premium Gasoline">고급 휘발유</option>
         </select>
         <button onClick={() => setView('map')} style={{ marginRight: '5px' }}>지도 보기</button>
         <button onClick={() => setView('list')}>목록 보기</button>
@@ -142,24 +117,52 @@ const App = () => {
         />
       ) : (
         <div>
-          <ul className="station-list" style={{ textAlign: 'left', margin: '0 auto', width: '70%' }}>
+          <ul className="station-list">
             {sortStationsByPrice(filteredStations).map((station) => (
-              <li key={station.id} style={{ borderBottom: '1px solid #ccc', padding: '10px 0' }}>
-                <h4>{station.name}</h4>
-                <p>주소: {station.address}</p>
-                <p>연료 종류: {station.fuelType}</p>
-                <p>가격: {station.price}원</p>
+              <li key={station.id}>
+                <div className="station-info">
+                  <h4>{station.name}</h4>
+                  <p className="station-address">주소: {station.address}</p>
+                  <p>연료 종류: {station.fuelType}</p>
+                </div>
+                <div className="station-price">{station.price}원</div>
               </li>
             ))}
           </ul>
           
-          {/* API 응답 데이터를 목록 보기 모드일 때만 화면에 출력 */}
-          {apiResponse && (
-            <div style={{ marginTop: '20px', padding: '10px', border: '1px solid #ddd' }}>
-              <h3>API 응답 데이터:</h3>
-              <pre>{JSON.stringify(apiResponse, null, 2)}</pre>
-            </div>
-          )}
+          {apiResponse && apiResponse.body && Array.isArray(apiResponse.body) && (
+  <div style={{ 
+    marginTop: '20px', 
+    padding: '20px', 
+    border: '1px solid #ddd', 
+    maxWidth: '600px', 
+    marginLeft: 'auto', 
+    marginRight: 'auto', 
+    backgroundColor: '#f9f9f9', 
+    borderRadius: '8px',
+    textAlign: 'center'
+  }}>
+    <h3 style={{ fontSize: '20px', color: '#333', marginBottom: '15px' }}>API 응답 데이터</h3>
+    
+    {apiResponse.body.map((station, index) => (
+      <div key={index} style={{ 
+        padding: '15px', 
+        marginBottom: '10px', 
+        borderBottom: '1px solid #ddd', 
+        textAlign: 'left',
+        backgroundColor: '#fff', 
+        borderRadius: '8px',
+        boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)'
+      }}>
+        <p style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>주유소 이름: {station.name}</p>
+        <p style={{ fontSize: '16px', color: '#555' }}>브랜드: {station.brand}</p>
+        <p style={{ fontSize: '16px', color: '#007bff', fontWeight: 'bold' }}>가격: {station.price}원</p>
+        <p style={{ fontSize: '14px', color: '#666' }}>위도: {station.latitude}</p>
+        <p style={{ fontSize: '14px', color: '#666' }}>경도: {station.longitude}</p>
+      </div>
+    ))}
+  </div>
+)}
         </div>
       )}
 
