@@ -1,10 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import './Map.css';
 
 const Map = ({ position, setPosition, stations, handleMarkerClick }) => {
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
-  const markerRef = useRef(null);
 
   useEffect(() => {
     const script = document.createElement('script');
@@ -22,16 +21,20 @@ const Map = ({ position, setPosition, stations, handleMarkerClick }) => {
           };
           mapInstance.current = new window.kakao.maps.Map(container, options);
 
-          // 현재 위치 마커
-          const currentPosition = new window.kakao.maps.LatLng(position.lat, position.lng);
+          // 현재 위치 마커 설정 (파란색)
+          const currentMarkerImage = new window.kakao.maps.MarkerImage(
+            'https://yourdomain.com/path/to/blue-marker.png', // 파란색 마커 이미지 URL로 교체 필요
+            new window.kakao.maps.Size(32, 32),
+            { offset: new window.kakao.maps.Point(16, 32) }
+          );
+
           const currentMarker = new window.kakao.maps.Marker({
-            position: currentPosition,
+            position: new window.kakao.maps.LatLng(position.lat, position.lng),
+            map: mapInstance.current,
+            image: currentMarkerImage,
             draggable: true,
           });
-          currentMarker.setMap(mapInstance.current);
-          markerRef.current = currentMarker;
 
-          // 마커 드래그 이벤트
           window.kakao.maps.event.addListener(currentMarker, 'dragend', () => {
             const newPosition = currentMarker.getPosition();
             setPosition({
@@ -40,18 +43,25 @@ const Map = ({ position, setPosition, stations, handleMarkerClick }) => {
             });
           });
 
-          // 주유소 마커 추가
+          // 주유소 마커 설정 (초록색)
+          const stationMarkerImage = new window.kakao.maps.MarkerImage(
+            'C:\Users\ijunsu\Desktop\ijunsu\github\GasStation/green-pin-with-pin-it_136558-84685-removebg-preview.png', // 초록색 마커 이미지 URL로 교체 필요
+            new window.kakao.maps.Size(32, 32),
+            { offset: new window.kakao.maps.Point(16, 32) }
+          );
+
           stations.forEach((station) => {
-            const stationPosition = new window.kakao.maps.LatLng(station.lat, station.lng);
+            const stationPosition = new window.kakao.maps.LatLng(station.latitude, station.longitude);
             const stationMarker = new window.kakao.maps.Marker({
               position: stationPosition,
+              map: mapInstance.current,
               title: station.name,
+              image: stationMarkerImage,
             });
-            stationMarker.setMap(mapInstance.current);
 
             // 주유소 마커 클릭 시 정보 표시
             window.kakao.maps.event.addListener(stationMarker, 'click', () => {
-              handleMarkerClick(station); // 주유소 클릭 시 정보 업데이트
+              handleMarkerClick(station);
             });
           });
         });
@@ -62,18 +72,15 @@ const Map = ({ position, setPosition, stations, handleMarkerClick }) => {
 
     return () => {
       if (script) {
-        script.remove();
+        document.head.removeChild(script);
       }
-      const container = mapRef.current;
-      if (container) {
-        container.innerHTML = '';
+      if (mapRef.current) {
+        mapRef.current.innerHTML = '';
       }
     };
   }, [position, stations, setPosition, handleMarkerClick]);
 
-  return (
-    <div id="map" ref={mapRef} className="map"></div>
-  );
+  return <div id="map" ref={mapRef} className="map"></div>;
 };
 
 export default Map;
