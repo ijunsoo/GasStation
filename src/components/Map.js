@@ -5,6 +5,21 @@ const Map = ({ position, setPosition, stations, handleMarkerClick }) => {
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
 
+  // 주유소와 현재 위치 간의 거리 계산 함수 (단위: km)
+  const calculateDistance = (lat1, lng1, lat2, lng2) => {
+    const R = 6371; // 지구의 반지름 (km)
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLng = ((lng2 - lng1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLng / 2) *
+        Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
   useEffect(() => {
     const script = document.createElement('script');
     script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=681868ddca9c534b3d512327465d8ff2&autoload=false`;
@@ -16,16 +31,15 @@ const Map = ({ position, setPosition, stations, handleMarkerClick }) => {
         window.kakao.maps.load(() => {
           const container = mapRef.current;
           const options = {
-            center: new window.kakao.maps.LatLng(position.lat, position.lng),
-            level: 3,
+            center: new window.kakao.maps.LatLng(position.lat, position.lng), // 초기 위치를 position으로 설정
+            level: 6, // 축소된 상태로 렌더링 (값을 높일수록 축소됨)
           };
           mapInstance.current = new window.kakao.maps.Map(container, options);
 
-          // 현재 위치 마커 설정 (파란색)
+          // 현재 위치 마커 설정
           const currentMarkerImage = new window.kakao.maps.MarkerImage(
-            'https://yourdomain.com/path/to/blue-marker.png', // 파란색 마커 이미지 URL로 교체 필요
-            new window.kakao.maps.Size(32, 32),
-            { offset: new window.kakao.maps.Point(16, 32) }
+            'https://raw.githubusercontent.com/ijunsoo/GasStation/main/green-pin-with-pin-it_136558-84685-removebg-preview.png',
+            new window.kakao.maps.Size(32, 32)
           );
 
           const currentMarker = new window.kakao.maps.Marker({
@@ -43,11 +57,10 @@ const Map = ({ position, setPosition, stations, handleMarkerClick }) => {
             });
           });
 
-          // 주유소 마커 설정 (초록색)
+          // 주유소 마커와 항상 표시될 인포윈도우 설정
           const stationMarkerImage = new window.kakao.maps.MarkerImage(
-            'C:\Users\ijunsu\Desktop\ijunsu\github\GasStation/green-pin-with-pin-it_136558-84685-removebg-preview.png', // 초록색 마커 이미지 URL로 교체 필요
-            new window.kakao.maps.Size(32, 32),
-            { offset: new window.kakao.maps.Point(16, 32) }
+            'https://img.icons8.com/fluency/48/008000/marker.png',
+            new window.kakao.maps.Size(32, 32)
           );
 
           stations.forEach((station) => {
@@ -55,18 +68,32 @@ const Map = ({ position, setPosition, stations, handleMarkerClick }) => {
             const stationMarker = new window.kakao.maps.Marker({
               position: stationPosition,
               map: mapInstance.current,
-              title: station.name,
               image: stationMarkerImage,
             });
 
-            // 주유소 마커 클릭 시 정보 표시
+            // 거리 계산
+            const distance = calculateDistance(position.lat, position.lng, station.latitude, station.longitude).toFixed(2);
+
+            // 항상 표시될 인포윈도우 설정
+            const infoWindow = new window.kakao.maps.InfoWindow({
+              content: `
+                <div style="padding:5px; font-size:14px;">
+                  <strong>${station.name}</strong><br/>
+                  가격: ${station.price}원<br/>
+                  거리: ${distance} km
+                </div>
+              `,
+              removable: false, // 항상 표시되도록 설정
+            });
+
+            infoWindow.open(mapInstance.current, stationMarker);
+
+            // 마커 클릭 시 주유소 정보 업데이트
             window.kakao.maps.event.addListener(stationMarker, 'click', () => {
               handleMarkerClick(station);
             });
           });
         });
-      } else {
-        console.error("Kakao Maps API 로드 실패");
       }
     };
 
@@ -78,7 +105,15 @@ const Map = ({ position, setPosition, stations, handleMarkerClick }) => {
         mapRef.current.innerHTML = '';
       }
     };
-  }, [position, stations, setPosition, handleMarkerClick]);
+  }, [position, stations, setPosition]);
+
+  // `position`이 변경될 때마다 지도 중심을 업데이트
+  useEffect(() => {
+    if (mapInstance.current) {
+      const newCenter = new window.kakao.maps.LatLng(position.lat, position.lng);
+      mapInstance.current.setCenter(newCenter);
+    }
+  }, [position]);
 
   return <div id="map" ref={mapRef} className="map"></div>;
 };

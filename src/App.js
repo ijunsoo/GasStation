@@ -1,23 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import Sidebar from './components/Sidebar';
 import Map from './components/Map';
 
 const App = () => {
-  const [position, setPosition] = useState({ lat: 37.5665, lng: 126.9784 });
-  const [stations, setStations] = useState([]); // 더미 데이터를 제거
+  const [position, setPosition] = useState({ lat: 37.58178222914391, lng: 127.00991747727649 });
+  const [stations, setStations] = useState([]);
   const [selectedStation, setSelectedStation] = useState(null);
   const [view, setView] = useState('map');
   const [fuelType, setFuelType] = useState('');
   const [filteredStations, setFilteredStations] = useState([]);
-  const [apiResponse, setApiResponse] = useState(null);
+  const [sortOption, setSortOption] = useState('distance');
+  const mapRef = useRef(null); // Map 컴포넌트 접근을 위한 참조
 
-  // 초기 로드 시 API 데이터 가져오기
   useEffect(() => {
-    handleSearch();
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          setPosition({ lat, lng });
+          handleSearch(lat, lng);
+        },
+        (error) => {
+          console.error("위치를 가져오는 데 실패했습니다.", error);
+          setPosition({ lat: 37.5665, lng: 126.9784 });
+          handleSearch(37.5665, 126.9784);
+        }
+      );
+    } else {
+      alert('Geolocation을 사용할 수 없습니다.');
+      setPosition({ lat: 37.5665, lng: 126.9784 });
+    }
   }, []);
 
-  // 연료 종류 필터링
   const handleFuelTypeChange = (type) => {
     setFuelType(type);
     setFilteredStations(
@@ -25,25 +41,15 @@ const App = () => {
     );
   };
 
-  // 마커 클릭 시 주유소 정보 업데이트
   const handleMarkerClick = (station) => {
     setSelectedStation(station);
   };
 
-  // 최소 가격 주유소 찾기
-  const findCheapestStation = () => {
-    if (!filteredStations || filteredStations.length === 0) return null;
-    return filteredStations.reduce((prev, curr) =>
-      prev.price < curr.price ? prev : curr
-    );
-  };
-
-  // 검색 버튼 클릭 시 호출될 함수
-  const handleSearch = async () => {
+  const handleSearch = async (lat, lng) => {
     try {
       const data = {
-        x: position.lat,
-        y: position.lng,
+        x: lat,
+        y: lng,
         radius: "5000",
         type: fuelType || '',
       };
@@ -58,10 +64,13 @@ const App = () => {
 
       if (response.ok) {
         const jsonResponse = await response.json();
-        console.log('백엔드 API 응답:', jsonResponse);
-        setStations(jsonResponse.body || []); // 주유소 데이터를 stations에 저장
-        setFilteredStations(jsonResponse.body || []); // 필터된 데이터 업데이트
-        setApiResponse(jsonResponse);
+        setStations(jsonResponse.body || []);
+        setFilteredStations(jsonResponse.body || []);
+        
+        // 지도 중심을 검색한 위치로 업데이트
+        if (mapRef.current) {
+          mapRef.current.recenterMap({ lat, lng });
+        }
       } else {
         console.error('데이터를 가져오는 데 실패했습니다.');
       }
@@ -70,26 +79,27 @@ const App = () => {
     }
   };
 
-  // 현재 위치 버튼 클릭 시 위치 설정 후 검색 호출
-  const handleLocateClick = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((position) => {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        setPosition({ lat, lng });
-        handleSearch(); // 위치가 설정된 후에 handleSearch 호출
-      });
-    } else {
-      alert('Geolocation을 사용할 수 없습니다.');
-    }
+  const calculateDistance = (lat1, lng1, lat2, lng2) => {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLng = ((lng2 - lng1) * Math.PI) / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
   };
 
-  const cheapestStation = findCheapestStation();
-
-  // 가격 오름차순 정렬 함수
-  const sortStationsByPrice = (stations) => {
-    if (!stations) return [];
-    return [...stations].sort((a, b) => a.price - b.price);
+  const getSortedStations = () => {
+    const sortedStations = [...filteredStations].sort((a, b) => {
+      if (sortOption === 'price') {
+        return a.price - b.price;
+      } else if (sortOption === 'distance') {
+        const distanceA = calculateDistance(position.lat, position.lng, a.latitude, a.longitude);
+        const distanceB = calculateDistance(position.lat, position.lng, b.latitude, b.longitude);
+        return distanceA - distanceB;
+      }
+      return 0;
+    });
+    return sortedStations.slice(0, 10);
   };
 
   return (
@@ -100,33 +110,48 @@ const App = () => {
           onChange={(e) => handleFuelTypeChange(e.target.value)}
           style={{ marginRight: '10px' }}
         >
-          <option value="">모든 연료 종류</option>
+          
           <option value="Gasoline">휘발유(가솔린)</option>
           <option value="Diesel">경유(디젤)</option>
-          <option value="Premium Gasoline">고급 휘발유</option>
         </select>
+        
+        <select
+          value={sortOption}
+          onChange={(e) => setSortOption(e.target.value)}
+          style={{ marginRight: '10px' }}
+        >
+          <option value="distance">거리순</option>
+          <option value="price">가격순</option>
+        </select>
+
         <button onClick={() => setView('map')} style={{ marginRight: '5px' }}>지도 보기</button>
         <button onClick={() => setView('list')}>목록 보기</button>
       </div>
 
-      {view === 'map' ? (
+      {position && view === 'map' ? (
         <Map
+          ref={mapRef} // Map 컴포넌트 참조
           position={position}
           setPosition={setPosition}
-          stations={stations} // 주유소 데이터 전달
+          stations={getSortedStations()}
           handleMarkerClick={handleMarkerClick}
         />
       ) : (
+        <div>Loading map...</div>
+      )}
+
+      {view === 'list' && (
         <div>
           <ul className="station-list">
-            {sortStationsByPrice(filteredStations).map((station, index) => (
+            {getSortedStations().map((station, index) => (
               <li key={index}>
                 <div className="station-info">
                   <h4>{station.name}</h4>
-                  <p className="station-address">브랜드: {station.brand}</p>
+                  <p>브랜드: {station.brand}</p>
                   <p>가격: {station.price}원</p>
                   <p>위도: {station.latitude}</p>
                   <p>경도: {station.longitude}</p>
+                  <p>거리: {calculateDistance(position.lat, position.lng, station.latitude, station.longitude).toFixed(2)} km</p>
                 </div>
               </li>
             ))}
@@ -134,13 +159,14 @@ const App = () => {
         </div>
       )}
 
-      <Sidebar
-        position={position}
-        onLocateClick={handleLocateClick}
-        onSearchClick={handleSearch}
-        selectedStation={selectedStation}
-        cheapestStation={cheapestStation}
-      />
+      {position && (
+        <Sidebar
+          position={position}
+          onLocateClick={() => handleSearch(position.lat, position.lng)}
+          onSearchClick={() => handleSearch(position.lat, position.lng)}
+          selectedStation={selectedStation}
+        />
+      )}
     </div>
   );
 };
